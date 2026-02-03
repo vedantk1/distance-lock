@@ -9,13 +9,16 @@
 ## Deliverables
 - `manifest.json`
 - `content.js`
-- `ui.html` / `ui.css` / `ui.js` (popup)
+- `popup.html` / `popup.css` / `popup.js`
+- `background.js`
+- `offscreen.html` / `offscreen.js`
 - `plan.md`
 
 ## Decisions (to avoid reinventing the wheel)
 - Face detection: MediaPipe Tasks Vision `FaceDetector` (WASM, local-only).
   - Bundle the JS + WASM + model with the extension.
   - Alternative fallback: face-api.js (TFJS-based) if MediaPipe causes friction.
+- Capture + detection run in an MV3 offscreen document (`USER_MEDIA` reason) to avoid per-site camera prompts and CSP issues. A lightweight background service worker relays updates to content scripts.
 
 ## Proposed Defaults (initial tuning)
 - `alpha` (EMA): `0.2`
@@ -31,7 +34,7 @@
 - `maxFaces`: `1` (largest face only)
 
 ## Behavior Spec (exact)
-- Capture webcam frames at `targetFps` into a hidden `<video>` and `<canvas>`.
+- Offscreen document captures webcam frames at `targetFps` into a hidden `<video>` and `<canvas>`.
 - Face metric: use face bbox width in pixels (largest face) as `S`.
 - Smoothing: EMA on `S`:
   - `S_smooth = alpha * S + (1 - alpha) * S_smooth`
@@ -44,7 +47,8 @@
   - `targetScale = clamp(1 / (r ^ k), minScale, 1.0)`
   - Otherwise `targetScale = 1.0`
 - Rate limit: `scale = clamp(targetScale, scale - maxScaleStep, scale + maxScaleStep)`
-- Apply: `document.documentElement.style.transform = scale(...)` and `transform-origin: center top`.
+- Offscreen sends `{ scale, state, r }` to background; background broadcasts to all connected content scripts.
+- Content scripts apply: `document.documentElement.style.transform = scale(...)` and `transform-origin: center top`.
 - No face detected:
   - If no face for `noFaceResetMs`, ease back to `1.0`.
   - Otherwise keep last scale (no extra punishment).
@@ -53,7 +57,9 @@
 
 ## Extension File Structure (minimal)
 - `manifest.json` (MV3)
-- `content.js` (camera + detection + scaling)
+- `background.js` (service worker, relay)
+- `offscreen.html` / `offscreen.js` (camera + detection)
+- `content.js` (scaling + HUD)
 - `content.css` (HUD styles)
 - `popup.html` / `popup.css` / `popup.js` (Enable, Calibrate, Sensitivity)
 - `assets/`
@@ -64,16 +70,18 @@
 ## Steps
 1. Lock the behavior spec + defaults (this doc).
 2. Draft extension structure + manifest permissions.
-3. Implement content script:
+3. Implement offscreen + background:
    - webcam capture
    - face detection (local)
    - compute scale
+   - broadcast to content scripts
+4. Implement content script:
    - apply CSS transform
-4. Implement popup UI and storage:
+   - HUD rendering
+5. Implement popup UI and storage:
    - Enable toggle
    - Calibrate button
    - Sensitivity slider (maps to `k`)
-5. Add overlay HUD and no-face/low-light handling.
 6. Manual test on a few sites, refine thresholds.
 
 ## Open Questions

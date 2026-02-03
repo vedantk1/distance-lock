@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inverse Lean Zoom</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div class="title">Inverse Lean Zoom</div>
+
+      <label class="row">
+        <input id="enableToggle" type="checkbox" />
+        <span>Enable</span>
+      </label>
+
+      <button id="calibrateBtn" type="button">Calibrate</button>
+
+      <label class="row">
+        <span>Sensitivity</span>
+        <input
+          id="sensitivity"
+          type="range"
+          min="0.8"
+          max="2.0"
+          step="0.05"
+          value="1.2"
+        />
+      </label>
+
+      <div id="status" class="status"></div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
