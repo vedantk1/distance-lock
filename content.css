@@ -1,1 +1,31 @@
-/* HUD styles will be added here. */
+#ilz-hud {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 2147483647;
+  font-family: "Arial", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(17, 17, 17, 0.85);
+  color: #f5f5f5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  transition: opacity 0.2s ease;
+  user-select: none;
+}
+
+#ilz-hud[data-state="ok"] {
+  opacity: 0.5;
+}
+
+#ilz-hud[data-state="too-close"] {
+  background: rgba(245, 96, 64, 0.9);
+  color: #111;
+  opacity: 1;
+}
+
+#ilz-hud[data-state="low-light"] {
+  background: rgba(250, 204, 21, 0.9);
+  color: #111;
+}
