@@ -54,6 +54,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return;
   }
 
+  if (message.type === "status-update") {
+    broadcast(message);
+    return;
+  }
+
   if (message.type === "offscreen-ready") {
     getSettings().then((settings) => sendResponse({ settings }));
     return true;
