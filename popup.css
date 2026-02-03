@@ -38,3 +38,7 @@ button {
   font-size: 12px;
   color: #9aa0a6;
 }
+
+input[type="range"] {
+  width: 100%;
+}

@@ -60,9 +60,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "settings-update") {
-    handleSettingsUpdate(message.settings).then((settings) =>
-      sendResponse({ settings })
-    );
+    const partial = message.settings || {};
+    if (Object.keys(partial).length === 0) {
+      getSettings().then((settings) => sendResponse({ settings }));
+    } else {
+      handleSettingsUpdate(partial).then((settings) => sendResponse({ settings }));
+    }
     return true;
   }
 
