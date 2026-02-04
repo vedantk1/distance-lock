@@ -1,6 +1,9 @@
 const port = chrome.runtime.connect({ name: "inverse-lean-zoom" });
 let enabled = false;
 let currentScale = 1;
+let pauseVideoOnLean = true;
+let lastState = "ok";
+const pausedVideos = new Set();
 
 const hud = createHud();
 
@@ -11,6 +14,7 @@ port.onMessage.addListener((message) => {
 
   if (message.type === "settings") {
     enabled = Boolean(message.settings?.enabled);
+    pauseVideoOnLean = Boolean(message.settings?.pauseVideoOnLean);
     if (!enabled) {
       resetScale();
     }
@@ -29,6 +33,7 @@ port.onMessage.addListener((message) => {
 
     applyScale(message.scale);
     updateHud(message);
+    handleVideoPause(message.state);
   }
 });
 
@@ -75,4 +80,36 @@ function updateHud(message) {
   } else {
     hud.textContent = `Neutral posture (${currentScale.toFixed(2)}x)`;
   }
+}
+
+function handleVideoPause(state) {
+  const nextState = state || "ok";
+
+  if (!pauseVideoOnLean) {
+    lastState = nextState;
+    return;
+  }
+
+  if (nextState === "too-close") {
+    const videos = document.querySelectorAll("video");
+    videos.forEach((video) => {
+      if (!video.paused && !video.ended) {
+        try {
+          video.pause();
+          pausedVideos.add(video);
+        } catch (error) {
+          // Ignore playback errors.
+        }
+      }
+    });
+  } else if (lastState === "too-close" && nextState !== "too-close") {
+    pausedVideos.forEach((video) => {
+      if (video.paused && !video.ended) {
+        video.play().catch(() => {});
+      }
+    });
+    pausedVideos.clear();
+  }
+
+  lastState = nextState;
 }

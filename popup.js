@@ -1,7 +1,31 @@
 const enableToggle = document.getElementById("enableToggle");
 const calibrateBtn = document.getElementById("calibrateBtn");
+const pauseVideoToggle = document.getElementById("pauseVideoToggle");
 const sensitivity = document.getElementById("sensitivity");
 const statusEl = document.getElementById("status");
+const cameraStatusEl = document.getElementById("cameraStatus");
+const calibStatusEl = document.getElementById("calibStatus");
+
+const port = chrome.runtime.connect({ name: "inverse-lean-zoom-popup" });
+let cameraActive = false;
+
+port.onMessage.addListener((message) => {
+  if (!message || typeof message.type !== "string") {
+    return;
+  }
+
+  if (message.type === "settings") {
+    syncUi(message.settings);
+    return;
+  }
+
+  if (message.type === "status-update") {
+    if (typeof message.cameraActive === "boolean") {
+      cameraActive = message.cameraActive;
+      updateCameraStatus();
+    }
+  }
+});
 
 init();
 
@@ -11,6 +35,13 @@ async function init() {
 
   enableToggle.addEventListener("change", async () => {
     const next = await updateSettings({ enabled: enableToggle.checked });
+    syncUi(next);
+  });
+
+  pauseVideoToggle.addEventListener("change", async () => {
+    const next = await updateSettings({
+      pauseVideoOnLean: pauseVideoToggle.checked,
+    });
     syncUi(next);
   });
 
@@ -46,9 +77,12 @@ function syncUi(settings, quiet = false) {
   }
 
   enableToggle.checked = Boolean(settings.enabled);
+  pauseVideoToggle.checked = Boolean(settings.pauseVideoOnLean);
   if (typeof settings.k === "number") {
     sensitivity.value = String(settings.k);
   }
+  calibStatusEl.textContent = settings.baseline ? "Yes" : "No";
+  updateCameraStatus();
 
   if (!quiet) {
     if (!settings.enabled) {
@@ -63,4 +97,13 @@ function syncUi(settings, quiet = false) {
 
 function status(message) {
   statusEl.textContent = message;
+}
+
+function updateCameraStatus() {
+  if (!enableToggle.checked) {
+    cameraStatusEl.textContent = "Off";
+    return;
+  }
+
+  cameraStatusEl.textContent = cameraActive ? "On" : "Starting…";
 }

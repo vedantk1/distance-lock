@@ -17,6 +17,11 @@
 
       <button id="calibrateBtn" type="button">Calibrate</button>
 
+      <label class="row">
+        <input id="pauseVideoToggle" type="checkbox" />
+        <span>Pause Video On Lean</span>
+      </label>
+
       <div class="row">
         <span>Sensitivity</span>
       </div>
@@ -30,6 +35,11 @@
       />
 
       <div id="status" class="status"></div>
+
+      <div class="meta">
+        <div>Camera: <span id="cameraStatus">Off</span></div>
+        <div>Calibrated: <span id="calibStatus">No</span></div>
+      </div>
     </div>
 
     <script src="popup.js"></script>

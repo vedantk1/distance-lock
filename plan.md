@@ -32,6 +32,7 @@
 - `noFaceResetMs`: `1500`
 - `lowLightLumaMin`: `35` (0-255)
 - `maxFaces`: `1` (largest face only)
+- `pauseVideoOnLean`: `true`
 
 ## Behavior Spec (exact)
 - Offscreen document captures webcam frames at `targetFps` into a hidden `<video>` and `<canvas>`.
@@ -49,6 +50,7 @@
 - Rate limit: `scale = clamp(targetScale, scale - maxScaleStep, scale + maxScaleStep)`
 - Offscreen sends `{ scale, state, r }` to background; background broadcasts to all connected content scripts.
 - Content scripts apply: `document.documentElement.style.transform = scale(...)` and `transform-origin: center top`.
+- Optional rule: if `pauseVideoOnLean` is true, pause any currently playing `<video>` elements when state is "too close"; resume only those the extension paused once state returns to neutral.
 - No face detected:
   - If no face for `noFaceResetMs`, ease back to `1.0`.
   - Otherwise keep last scale (no extra punishment).

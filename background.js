@@ -1,6 +1,10 @@
 const ports = new Set();
 const OFFSCREEN_URL = "offscreen.html";
 let creatingOffscreen = null;
+let lastStatus = {
+  cameraActive: false,
+  lowLight: false,
+};
 
 const DEFAULT_SETTINGS = {
   enabled: false,
@@ -15,6 +19,7 @@ const DEFAULT_SETTINGS = {
   noFaceResetMs: 1500,
   lowLightLumaMin: 35,
   baseline: null,
+  pauseVideoOnLean: true,
 };
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -37,6 +42,7 @@ chrome.runtime.onConnect.addListener(async (port) => {
 
   const settings = await getSettings();
   port.postMessage({ type: "settings", settings });
+  port.postMessage({ type: "status-update", ...lastStatus });
 
   if (settings.enabled) {
     await ensureOffscreenDocument();
@@ -55,6 +61,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "status-update") {
+    const nextStatus = { ...lastStatus };
+    if (typeof message.cameraActive === "boolean") {
+      nextStatus.cameraActive = message.cameraActive;
+    }
+    if (typeof message.lowLight === "boolean") {
+      nextStatus.lowLight = message.lowLight;
+    }
+    lastStatus = nextStatus;
     broadcast(message);
     return;
   }
@@ -101,6 +115,8 @@ async function handleSettingsUpdate(partial) {
     await ensureOffscreenDocument();
     await sendSettingsToOffscreen(next, true);
   } else {
+    lastStatus = { ...lastStatus, cameraActive: false };
+    broadcast({ type: "status-update", ...lastStatus });
     await sendSettingsToOffscreen(next, false);
     await closeOffscreenDocument();
   }

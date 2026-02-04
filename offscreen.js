@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   noFaceResetMs: 1500,
   lowLightLumaMin: 35,
   baseline: null,
+  pauseVideoOnLean: true,
 };
 
 const state = {
@@ -30,6 +31,7 @@ const state = {
   lastFaceTs: 0,
   lastLumaCheck: 0,
   lowLight: false,
+  cameraActive: false,
   smoothSize: null,
   scale: 1,
   tooClose: false,
@@ -88,6 +90,7 @@ async function startInternal() {
   await ensureCamera();
   startLoop();
   state.running = true;
+  sendStatusUpdate();
 }
 
 async function stop() {
@@ -109,6 +112,8 @@ async function stop() {
   state.scale = 1;
   state.tooClose = false;
   state.smoothSize = null;
+  state.cameraActive = false;
+  sendStatusUpdate();
   sendScaleUpdate({ state: "disabled" });
 }
 
@@ -159,6 +164,8 @@ async function ensureCamera() {
 
   state.video.srcObject = state.stream;
   await state.video.play();
+  state.cameraActive = true;
+  sendStatusUpdate();
 }
 
 function startLoop() {
@@ -214,7 +221,11 @@ function updateLighting(now) {
   lumaCtx.drawImage(video, 0, 0, lumaCanvas.width, lumaCanvas.height);
   const frame = lumaCtx.getImageData(0, 0, lumaCanvas.width, lumaCanvas.height);
   const avgLuma = averageLuma(frame.data);
+  const wasLowLight = state.lowLight;
   state.lowLight = avgLuma < state.settings.lowLightLumaMin;
+  if (state.lowLight !== wasLowLight) {
+    sendStatusUpdate();
+  }
 }
 
 function averageLuma(data) {
@@ -280,6 +291,14 @@ function sendScaleUpdate(extra) {
     type: "scale-update",
     scale: state.scale,
     ...extra,
+  });
+}
+
+function sendStatusUpdate() {
+  chrome.runtime.sendMessage({
+    type: "status-update",
+    cameraActive: state.cameraActive,
+    lowLight: state.lowLight,
   });
 }
 
