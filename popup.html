@@ -65,6 +65,90 @@
           Grant Camera Access
         </button>
       </div>
+
+      <!-- Advanced Settings (collapsible) -->
+      <div class="section">
+        <button id="advancedToggle" type="button" class="advanced-toggle">
+          <span>Advanced Settings</span>
+          <span id="advancedArrow" class="arrow">▶</span>
+        </button>
+
+        <div id="advancedPanel" class="advanced-panel" style="display: none">
+          <div class="row">
+            <span>Max Zoom Out</span>
+            <span id="minScaleValue" class="value">72%</span>
+          </div>
+          <input
+            id="minScale"
+            type="range"
+            min="0.5"
+            max="0.95"
+            step="0.01"
+            value="0.72"
+          />
+          <div class="helper">How much the page can shrink.</div>
+
+          <div class="row">
+            <span>Trigger Distance</span>
+            <span id="engageThresholdValue" class="value">1.12x</span>
+          </div>
+          <input
+            id="engageThreshold"
+            type="range"
+            min="1.05"
+            max="1.5"
+            step="0.01"
+            value="1.12"
+          />
+          <div class="helper">How close before zoom activates.</div>
+
+          <div class="row">
+            <span>Transition Speed</span>
+            <span id="maxScaleStepValue" class="value">4%</span>
+          </div>
+          <input
+            id="maxScaleStep"
+            type="range"
+            min="0.01"
+            max="0.15"
+            step="0.01"
+            value="0.04"
+          />
+          <div class="helper">Animation smoothness (lower = smoother).</div>
+
+          <div class="row">
+            <span>Face Lost Timeout</span>
+            <span id="noFaceResetMsValue" class="value">1.5s</span>
+          </div>
+          <input
+            id="noFaceResetMs"
+            type="range"
+            min="500"
+            max="5000"
+            step="100"
+            value="1500"
+          />
+          <div class="helper">Time before resetting when face is lost.</div>
+
+          <div class="row">
+            <span>Low Light Threshold</span>
+            <span id="lowLightLumaMinValue" class="value">35</span>
+          </div>
+          <input
+            id="lowLightLumaMin"
+            type="range"
+            min="10"
+            max="80"
+            step="1"
+            value="35"
+          />
+          <div class="helper">Brightness level to pause detection.</div>
+
+          <button id="resetAdvanced" type="button" class="reset-btn">
+            Reset to Defaults
+          </button>
+        </div>
+      </div>
     </div>
 
     <script src="popup.js"></script>

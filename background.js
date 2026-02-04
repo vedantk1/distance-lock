@@ -95,22 +95,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "calibrate") {
-    ensureOffscreenDocument()
-      .then(() => {
-        chrome.runtime.sendMessage({ type: "calibrate" });
-        sendResponse({ ok: true });
-      })
-      .catch((error) => {
+    (async () => {
+      try {
+        await ensureOffscreenDocument();
+        // Send calibrate to offscreen and wait for response
+        const result = await chrome.runtime.sendMessage({ type: "calibrate" });
+        if (result?.ok && typeof result.baseline === "number") {
+          // Save baseline to settings
+          await handleSettingsUpdate({ baseline: result.baseline });
+        }
+        sendResponse(
+          result || { ok: false, error: "No response from offscreen" },
+        );
+      } catch (error) {
         console.warn("calibrate failed", error);
         sendResponse({ ok: false, error: error?.message || String(error) });
-      });
-    return true;
-  }
-
-  if (message.type === "baseline-update") {
-    handleSettingsUpdate({ baseline: message.baseline }).then((settings) =>
-      sendResponse({ settings }),
-    );
+      }
+    })();
     return true;
   }
 

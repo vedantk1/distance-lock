@@ -13,6 +13,30 @@ const lightValue = document.getElementById("lightValue");
 const cameraHelp = document.getElementById("cameraHelp");
 const requestPermissionBtn = document.getElementById("requestPermissionBtn");
 
+// Advanced settings elements
+const advancedToggle = document.getElementById("advancedToggle");
+const advancedArrow = document.getElementById("advancedArrow");
+const advancedPanel = document.getElementById("advancedPanel");
+const minScaleInput = document.getElementById("minScale");
+const minScaleValue = document.getElementById("minScaleValue");
+const engageThresholdInput = document.getElementById("engageThreshold");
+const engageThresholdValue = document.getElementById("engageThresholdValue");
+const maxScaleStepInput = document.getElementById("maxScaleStep");
+const maxScaleStepValue = document.getElementById("maxScaleStepValue");
+const noFaceResetMsInput = document.getElementById("noFaceResetMs");
+const noFaceResetMsValue = document.getElementById("noFaceResetMsValue");
+const lowLightLumaMinInput = document.getElementById("lowLightLumaMin");
+const lowLightLumaMinValue = document.getElementById("lowLightLumaMinValue");
+const resetAdvancedBtn = document.getElementById("resetAdvanced");
+
+const ADVANCED_DEFAULTS = {
+  minScale: 0.72,
+  engageThreshold: 1.12,
+  maxScaleStep: 0.04,
+  noFaceResetMs: 1500,
+  lowLightLumaMin: 35,
+};
+
 const port = chrome.runtime.connect({ name: "inverse-lean-zoom-popup" });
 let cameraActive = false;
 let cameraError = null;
@@ -87,14 +111,78 @@ async function init() {
 
   calibrateBtn.addEventListener("click", async () => {
     status("Calibrating…");
-    await chrome.runtime.sendMessage({ type: "calibrate" });
-    status("Baseline captured");
+    calibrateBtn.disabled = true;
+
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "calibrate" });
+      if (response?.ok) {
+        status("Calibrated!");
+        // Refresh settings to update UI
+        const settings = await getSettings();
+        syncUi(settings);
+      } else {
+        status(response?.error || "Calibration failed");
+      }
+    } catch (error) {
+      status("Calibration failed: " + error.message);
+    } finally {
+      calibrateBtn.disabled = false;
+    }
   });
 
   requestPermissionBtn.addEventListener("click", async () => {
     // Open permission page in a new tab to request camera access
     await chrome.runtime.sendMessage({ type: "request-permission" });
     status("Opening permission page...");
+  });
+
+  // Advanced settings toggle
+  advancedToggle.addEventListener("click", () => {
+    const isOpen = advancedPanel.style.display !== "none";
+    advancedPanel.style.display = isOpen ? "none" : "grid";
+    advancedArrow.classList.toggle("open", !isOpen);
+  });
+
+  // Advanced settings sliders
+  minScaleInput.addEventListener("input", async () => {
+    const minScale = Number.parseFloat(minScaleInput.value);
+    minScaleValue.textContent = `${Math.round(minScale * 100)}%`;
+    await updateSettings({ minScale });
+  });
+
+  engageThresholdInput.addEventListener("input", async () => {
+    const engageThreshold = Number.parseFloat(engageThresholdInput.value);
+    engageThresholdValue.textContent = `${engageThreshold.toFixed(2)}x`;
+    // Auto-calculate disengage threshold (slightly lower)
+    const disengageThreshold = Math.max(1.01, engageThreshold - 0.06);
+    await updateSettings({ engageThreshold, disengageThreshold });
+  });
+
+  maxScaleStepInput.addEventListener("input", async () => {
+    const maxScaleStep = Number.parseFloat(maxScaleStepInput.value);
+    maxScaleStepValue.textContent = `${Math.round(maxScaleStep * 100)}%`;
+    await updateSettings({ maxScaleStep });
+  });
+
+  noFaceResetMsInput.addEventListener("input", async () => {
+    const noFaceResetMs = Number.parseInt(noFaceResetMsInput.value, 10);
+    noFaceResetMsValue.textContent = `${(noFaceResetMs / 1000).toFixed(1)}s`;
+    await updateSettings({ noFaceResetMs });
+  });
+
+  lowLightLumaMinInput.addEventListener("input", async () => {
+    const lowLightLumaMin = Number.parseInt(lowLightLumaMinInput.value, 10);
+    lowLightLumaMinValue.textContent = String(lowLightLumaMin);
+    await updateSettings({ lowLightLumaMin });
+  });
+
+  // Reset advanced settings
+  resetAdvancedBtn.addEventListener("click", async () => {
+    const disengageThreshold = ADVANCED_DEFAULTS.engageThreshold - 0.06;
+    await updateSettings({ ...ADVANCED_DEFAULTS, disengageThreshold });
+    const settings = await getSettings();
+    syncUi(settings);
+    status("Advanced settings reset");
   });
 }
 
@@ -127,6 +215,29 @@ function syncUi(settings, quiet = false) {
     sensitivityValue.textContent = settings.k.toFixed(2);
   }
   calibStatusEl.textContent = settings.baseline ? "Yes" : "No";
+
+  // Sync advanced settings
+  if (typeof settings.minScale === "number") {
+    minScaleInput.value = String(settings.minScale);
+    minScaleValue.textContent = `${Math.round(settings.minScale * 100)}%`;
+  }
+  if (typeof settings.engageThreshold === "number") {
+    engageThresholdInput.value = String(settings.engageThreshold);
+    engageThresholdValue.textContent = `${settings.engageThreshold.toFixed(2)}x`;
+  }
+  if (typeof settings.maxScaleStep === "number") {
+    maxScaleStepInput.value = String(settings.maxScaleStep);
+    maxScaleStepValue.textContent = `${Math.round(settings.maxScaleStep * 100)}%`;
+  }
+  if (typeof settings.noFaceResetMs === "number") {
+    noFaceResetMsInput.value = String(settings.noFaceResetMs);
+    noFaceResetMsValue.textContent = `${(settings.noFaceResetMs / 1000).toFixed(1)}s`;
+  }
+  if (typeof settings.lowLightLumaMin === "number") {
+    lowLightLumaMinInput.value = String(settings.lowLightLumaMin);
+    lowLightLumaMinValue.textContent = String(settings.lowLightLumaMin);
+  }
+
   updateStatusUi();
 
   if (!quiet) {

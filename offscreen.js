@@ -1,4 +1,7 @@
-import { FaceDetector, FilesetResolver } from "./assets/mediapipe/vision_bundle.mjs";
+import {
+  FaceDetector,
+  FilesetResolver,
+} from "./assets/mediapipe/vision_bundle.mjs";
 
 const DEFAULT_SETTINGS = {
   enabled: false,
@@ -62,14 +65,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "calibrate") {
-    try {
-      calibrate();
-      sendResponse({ ok: true });
-    } catch (error) {
-      reportError(error);
-      sendResponse({ ok: false, error: normalizeError(error) });
-    }
-    return;
+    (async () => {
+      try {
+        const result = await calibrate();
+        sendResponse({
+          ok: result.ok,
+          baseline: result.baseline,
+          error: result.error,
+        });
+      } catch (error) {
+        reportError(error);
+        sendResponse({ ok: false, error: normalizeError(error)?.message });
+      }
+    })();
+    return true;
   }
 });
 
@@ -146,7 +155,7 @@ async function ensureDetector() {
 
   const wasmRoot = chrome.runtime.getURL("assets/mediapipe/wasm");
   const modelPath = chrome.runtime.getURL(
-    "assets/mediapipe/blaze_face_short_range.tflite"
+    "assets/mediapipe/blaze_face_short_range.tflite",
   );
 
   const vision = await FilesetResolver.forVisionTasks(wasmRoot);
@@ -313,11 +322,7 @@ function updateScale(size) {
 
 function easeToScale(targetScale, stateLabel, ratio) {
   const step = state.settings.maxScaleStep;
-  const next = clamp(
-    targetScale,
-    state.scale - step,
-    state.scale + step
-  );
+  const next = clamp(targetScale, state.scale - step, state.scale + step);
   state.scale = next;
   sendScaleUpdate({ state: stateLabel, ratio });
 }
@@ -372,13 +377,39 @@ function normalizeError(error) {
   return { name, message, code };
 }
 
-function calibrate() {
+async function calibrate() {
+  // If we already have a smoothSize from running detection, use that
   if (state.smoothSize) {
     state.settings.baseline = state.smoothSize;
-    chrome.runtime.sendMessage({
-      type: "baseline-update",
-      baseline: state.settings.baseline,
-    });
+    return { ok: true, baseline: state.settings.baseline };
+  }
+
+  // Otherwise, try to detect a face right now
+  if (!state.detector || !state.video || state.video.readyState < 2) {
+    return { ok: false, error: "Camera not ready. Please wait and try again." };
+  }
+
+  try {
+    const now = performance.now();
+    const results = state.detector.detectForVideo(state.video, now);
+    const detections = results?.detections ?? results ?? [];
+    const faceWidth = getLargestFaceWidth(detections);
+
+    if (!faceWidth) {
+      return {
+        ok: false,
+        error: "No face detected. Please look at the camera.",
+      };
+    }
+
+    // Set the baseline to the detected face width
+    state.smoothSize = faceWidth;
+    state.settings.baseline = faceWidth;
+    state.lastFaceTs = now;
+
+    return { ok: true, baseline: state.settings.baseline };
+  } catch (error) {
+    return { ok: false, error: error.message || "Face detection failed" };
   }
 }
 
