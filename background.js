@@ -87,7 +87,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (Object.keys(partial).length === 0) {
       getSettings().then((settings) => sendResponse({ settings }));
     } else {
-      handleSettingsUpdate(partial).then((settings) => sendResponse({ settings }));
+      handleSettingsUpdate(partial).then((settings) =>
+        sendResponse({ settings }),
+      );
     }
     return true;
   }
@@ -107,8 +109,32 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "baseline-update") {
     handleSettingsUpdate({ baseline: message.baseline }).then((settings) =>
-      sendResponse({ settings })
+      sendResponse({ settings }),
     );
+    return true;
+  }
+
+  if (message.type === "request-permission") {
+    // Open the permission page in a new tab to request camera access
+    // Offscreen documents cannot show permission prompts
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("permission.html"),
+      active: true,
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (message.type === "permission-granted") {
+    // Permission was granted from the permission page
+    // If extension was waiting to be enabled, retry now
+    getSettings().then(async (settings) => {
+      if (settings.enabled) {
+        await ensureOffscreenDocument();
+        await sendSettingsToOffscreen(settings, true);
+      }
+    });
+    sendResponse({ ok: true });
     return true;
   }
 });
@@ -167,7 +193,8 @@ async function ensureOffscreenDocument() {
   creatingOffscreen = chrome.offscreen.createDocument({
     url: OFFSCREEN_URL,
     reasons: ["USER_MEDIA"],
-    justification: "Capture webcam frames for on-device face distance estimation.",
+    justification:
+      "Capture webcam frames for on-device face distance estimation.",
   });
 
   await creatingOffscreen;

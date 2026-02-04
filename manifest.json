@@ -3,8 +3,15 @@
   "name": "Inverse Lean Zoom",
   "version": "0.1.0",
   "description": "Inverse zoom: lean in and the page shrinks.",
-  "permissions": ["storage", "offscreen"],
+  "permissions": ["storage", "offscreen", "tabs"],
   "host_permissions": ["<all_urls>"],
+  "optional_permissions": [],
+  "web_accessible_resources": [
+    {
+      "resources": ["offscreen.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   },

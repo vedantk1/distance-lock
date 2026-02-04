@@ -35,6 +35,28 @@ body {
   margin-top: -6px;
 }
 
+.helper.error {
+  background: rgba(245, 96, 64, 0.15);
+  border: 1px solid rgba(245, 96, 64, 0.4);
+  border-radius: 6px;
+  padding: 8px;
+  color: #f5f5f5;
+  margin-top: 0;
+}
+
+.permission-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  background: #4285f4;
+  color: white;
+  font-weight: 600;
+}
+
+.permission-btn:hover {
+  background: #5a95f5;
+}
+
 button {
   background: #f5f5f5;
   color: #111;

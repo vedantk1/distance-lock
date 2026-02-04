@@ -10,6 +10,8 @@ const statePill = document.getElementById("statePill");
 const scaleValue = document.getElementById("scaleValue");
 const ratioValue = document.getElementById("ratioValue");
 const lightValue = document.getElementById("lightValue");
+const cameraHelp = document.getElementById("cameraHelp");
+const requestPermissionBtn = document.getElementById("requestPermissionBtn");
 
 const port = chrome.runtime.connect({ name: "inverse-lean-zoom-popup" });
 let cameraActive = false;
@@ -88,10 +90,19 @@ async function init() {
     await chrome.runtime.sendMessage({ type: "calibrate" });
     status("Baseline captured");
   });
+
+  requestPermissionBtn.addEventListener("click", async () => {
+    // Open permission page in a new tab to request camera access
+    await chrome.runtime.sendMessage({ type: "request-permission" });
+    status("Opening permission page...");
+  });
 }
 
 async function getSettings() {
-  const response = await chrome.runtime.sendMessage({ type: "settings-update", settings: {} });
+  const response = await chrome.runtime.sendMessage({
+    type: "settings-update",
+    settings: {},
+  });
   return response?.settings ?? {};
 }
 
@@ -141,22 +152,26 @@ function updateCameraStatus() {
 
   if (cameraError && cameraError.code === "permission") {
     cameraStatusEl.textContent = "Permission denied";
+    cameraHelp.style.display = "block";
     status("Allow camera access");
     return;
   }
 
   if (cameraError && cameraError.code === "no-camera") {
     cameraStatusEl.textContent = "No camera";
+    cameraHelp.style.display = "none";
     status("No camera detected");
     return;
   }
 
   if (cameraError && cameraError.code === "in-use") {
     cameraStatusEl.textContent = "In use";
+    cameraHelp.style.display = "none";
     status("Camera busy");
     return;
   }
 
+  cameraHelp.style.display = "none";
   cameraStatusEl.textContent = cameraActive ? "On" : "Starting…";
 }
 
