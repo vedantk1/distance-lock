@@ -71,6 +71,10 @@ function updateHud(message) {
 
   if (state === "too-close") {
     hud.textContent = "Lean detected → zooming out";
+  } else if (state === "camera-permission") {
+    hud.textContent = "Camera permission denied";
+  } else if (state === "camera-error") {
+    hud.textContent = "Camera unavailable";
   } else if (state === "low-light") {
     hud.textContent = "Lighting too low";
   } else if (state === "no-face") {

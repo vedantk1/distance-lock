@@ -10,20 +10,24 @@
     <div id="app">
       <div class="title">Inverse Lean Zoom</div>
 
-      <label class="row">
-        <input id="enableToggle" type="checkbox" />
+      <label class="row toggle-row">
         <span>Enable</span>
+        <input id="enableToggle" type="checkbox" />
       </label>
+      <div class="helper">Applies inverse zoom to all pages.</div>
 
       <button id="calibrateBtn" type="button">Calibrate</button>
+      <div class="helper">Sit comfortably, then click Calibrate.</div>
 
-      <label class="row">
-        <input id="pauseVideoToggle" type="checkbox" />
+      <label class="row toggle-row">
         <span>Pause Video On Lean</span>
+        <input id="pauseVideoToggle" type="checkbox" />
       </label>
+      <div class="helper">Pauses playing videos when too close.</div>
 
       <div class="row">
         <span>Sensitivity</span>
+        <span id="sensitivityValue" class="value">1.20</span>
       </div>
       <input
         id="sensitivity"
@@ -36,9 +40,22 @@
 
       <div id="status" class="status"></div>
 
-      <div class="meta">
-        <div>Camera: <span id="cameraStatus">Off</span></div>
-        <div>Calibrated: <span id="calibStatus">No</span></div>
+      <div class="section">
+        <div class="section-title">Live Status</div>
+        <div class="status-grid">
+          <div>State</div>
+          <div><span id="statePill" class="pill">Disabled</span></div>
+          <div>Scale</div>
+          <div><span id="scaleValue">—</span></div>
+          <div>Distance</div>
+          <div><span id="ratioValue">—</span></div>
+          <div>Lighting</div>
+          <div><span id="lightValue">—</span></div>
+          <div>Camera</div>
+          <div><span id="cameraStatus">Off</span></div>
+          <div>Calibrated</div>
+          <div><span id="calibStatus">No</span></div>
+        </div>
       </div>
     </div>
 

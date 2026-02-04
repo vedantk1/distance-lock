@@ -32,6 +32,7 @@ const state = {
   lastLumaCheck: 0,
   lowLight: false,
   cameraActive: false,
+  cameraError: null,
   smoothSize: null,
   scale: 1,
   tooClose: false,
@@ -43,18 +44,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "settings-update") {
-    state.settings = { ...state.settings, ...message.settings };
-    if (state.settings.enabled) {
-      start().then(() => sendResponse({ ok: true }));
-    } else {
-      stop().then(() => sendResponse({ ok: true }));
-    }
+    (async () => {
+      try {
+        state.settings = { ...state.settings, ...message.settings };
+        if (state.settings.enabled) {
+          await start();
+        } else {
+          await stop();
+        }
+        sendResponse({ ok: true });
+      } catch (error) {
+        reportError(error);
+        sendResponse({ ok: false, error: normalizeError(error) });
+      }
+    })();
     return true;
   }
 
   if (message.type === "calibrate") {
-    calibrate();
-    sendResponse({ ok: true });
+    try {
+      calibrate();
+      sendResponse({ ok: true });
+    } catch (error) {
+      reportError(error);
+      sendResponse({ ok: false, error: normalizeError(error) });
+    }
     return;
   }
 });
@@ -62,13 +76,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 init();
 
 async function init() {
-  const response = await chrome.runtime.sendMessage({ type: "offscreen-ready" });
-  if (response && response.settings) {
-    state.settings = { ...state.settings, ...response.settings };
-  }
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "offscreen-ready",
+    });
+    if (response && response.settings) {
+      state.settings = { ...state.settings, ...response.settings };
+    }
 
-  if (state.settings.enabled) {
-    await start();
+    if (state.settings.enabled) {
+      await start();
+    }
+  } catch (error) {
+    reportError(error);
   }
 }
 
@@ -90,6 +110,7 @@ async function startInternal() {
   await ensureCamera();
   startLoop();
   state.running = true;
+  state.cameraError = null;
   sendStatusUpdate();
 }
 
@@ -113,6 +134,7 @@ async function stop() {
   state.tooClose = false;
   state.smoothSize = null;
   state.cameraActive = false;
+  state.cameraError = null;
   sendStatusUpdate();
   sendScaleUpdate({ state: "disabled" });
 }
@@ -157,15 +179,23 @@ async function ensureCamera() {
     willReadFrequently: true,
   });
 
-  state.stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user" },
-    audio: false,
-  });
+  try {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false,
+    });
 
-  state.video.srcObject = state.stream;
-  await state.video.play();
-  state.cameraActive = true;
-  sendStatusUpdate();
+    state.video.srcObject = state.stream;
+    await state.video.play();
+    state.cameraActive = true;
+    state.cameraError = null;
+    sendStatusUpdate();
+  } catch (error) {
+    state.cameraActive = false;
+    state.cameraError = normalizeError(error);
+    sendStatusUpdate();
+    throw error;
+  }
 }
 
 function startLoop() {
@@ -194,7 +224,13 @@ function processFrame() {
     return;
   }
 
-  const results = state.detector.detectForVideo(state.video, now);
+  let results;
+  try {
+    results = state.detector.detectForVideo(state.video, now);
+  } catch (error) {
+    reportError(error);
+    return;
+  }
   const detections = results?.detections ?? results ?? [];
   const faceWidth = getLargestFaceWidth(detections);
 
@@ -299,7 +335,41 @@ function sendStatusUpdate() {
     type: "status-update",
     cameraActive: state.cameraActive,
     lowLight: state.lowLight,
+    cameraError: state.cameraError,
   });
+}
+
+function reportError(error) {
+  const info = normalizeError(error);
+  state.cameraError = info;
+  state.cameraActive = false;
+  state.running = false;
+  state.lowLight = false;
+  sendStatusUpdate();
+  sendScaleUpdate({
+    state: info?.code === "permission" ? "camera-permission" : "camera-error",
+    error: info?.message,
+  });
+}
+
+function normalizeError(error) {
+  if (!error) {
+    return null;
+  }
+
+  const name = error.name || "Error";
+  const message = error.message || String(error);
+  let code = "unknown";
+
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    code = "permission";
+  } else if (name === "NotFoundError") {
+    code = "no-camera";
+  } else if (name === "NotReadableError") {
+    code = "in-use";
+  }
+
+  return { name, message, code };
 }
 
 function calibrate() {

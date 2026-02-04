@@ -4,6 +4,7 @@ let creatingOffscreen = null;
 let lastStatus = {
   cameraActive: false,
   lowLight: false,
+  cameraError: null,
 };
 
 const DEFAULT_SETTINGS = {
@@ -68,6 +69,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (typeof message.lowLight === "boolean") {
       nextStatus.lowLight = message.lowLight;
     }
+    if (message.cameraError !== undefined) {
+      nextStatus.cameraError = message.cameraError;
+    }
     lastStatus = nextStatus;
     broadcast(message);
     return;
@@ -89,10 +93,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "calibrate") {
-    ensureOffscreenDocument().then(() => {
-      chrome.runtime.sendMessage({ type: "calibrate" });
-      sendResponse({ ok: true });
-    });
+    ensureOffscreenDocument()
+      .then(() => {
+        chrome.runtime.sendMessage({ type: "calibrate" });
+        sendResponse({ ok: true });
+      })
+      .catch((error) => {
+        console.warn("calibrate failed", error);
+        sendResponse({ ok: false, error: error?.message || String(error) });
+      });
     return true;
   }
 
@@ -115,7 +124,7 @@ async function handleSettingsUpdate(partial) {
     await ensureOffscreenDocument();
     await sendSettingsToOffscreen(next, true);
   } else {
-    lastStatus = { ...lastStatus, cameraActive: false };
+    lastStatus = { ...lastStatus, cameraActive: false, cameraError: null };
     broadcast({ type: "status-update", ...lastStatus });
     await sendSettingsToOffscreen(next, false);
     await closeOffscreenDocument();

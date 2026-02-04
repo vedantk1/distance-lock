@@ -2,12 +2,23 @@ const enableToggle = document.getElementById("enableToggle");
 const calibrateBtn = document.getElementById("calibrateBtn");
 const pauseVideoToggle = document.getElementById("pauseVideoToggle");
 const sensitivity = document.getElementById("sensitivity");
+const sensitivityValue = document.getElementById("sensitivityValue");
 const statusEl = document.getElementById("status");
 const cameraStatusEl = document.getElementById("cameraStatus");
 const calibStatusEl = document.getElementById("calibStatus");
+const statePill = document.getElementById("statePill");
+const scaleValue = document.getElementById("scaleValue");
+const ratioValue = document.getElementById("ratioValue");
+const lightValue = document.getElementById("lightValue");
 
 const port = chrome.runtime.connect({ name: "inverse-lean-zoom-popup" });
 let cameraActive = false;
+let cameraError = null;
+let lowLight = false;
+let lastScale = null;
+let lastRatio = null;
+let lastState = "disabled";
+let currentSettings = {};
 
 port.onMessage.addListener((message) => {
   if (!message || typeof message.type !== "string") {
@@ -22,8 +33,29 @@ port.onMessage.addListener((message) => {
   if (message.type === "status-update") {
     if (typeof message.cameraActive === "boolean") {
       cameraActive = message.cameraActive;
-      updateCameraStatus();
     }
+    if (message.cameraError !== undefined) {
+      cameraError = message.cameraError;
+    }
+    if (typeof message.lowLight === "boolean") {
+      lowLight = message.lowLight;
+    }
+    updateStatusUi();
+    return;
+  }
+
+  if (message.type === "scale-update") {
+    if (typeof message.scale === "number") {
+      lastScale = message.scale;
+    }
+    if (typeof message.ratio === "number") {
+      lastRatio = message.ratio;
+    }
+    if (message.state) {
+      lastState = message.state;
+    }
+    updateStatusUi();
+    return;
   }
 });
 
@@ -76,13 +108,15 @@ function syncUi(settings, quiet = false) {
     return;
   }
 
+  currentSettings = settings;
   enableToggle.checked = Boolean(settings.enabled);
   pauseVideoToggle.checked = Boolean(settings.pauseVideoOnLean);
   if (typeof settings.k === "number") {
     sensitivity.value = String(settings.k);
+    sensitivityValue.textContent = settings.k.toFixed(2);
   }
   calibStatusEl.textContent = settings.baseline ? "Yes" : "No";
-  updateCameraStatus();
+  updateStatusUi();
 
   if (!quiet) {
     if (!settings.enabled) {
@@ -105,5 +139,97 @@ function updateCameraStatus() {
     return;
   }
 
+  if (cameraError && cameraError.code === "permission") {
+    cameraStatusEl.textContent = "Permission denied";
+    status("Allow camera access");
+    return;
+  }
+
+  if (cameraError && cameraError.code === "no-camera") {
+    cameraStatusEl.textContent = "No camera";
+    status("No camera detected");
+    return;
+  }
+
+  if (cameraError && cameraError.code === "in-use") {
+    cameraStatusEl.textContent = "In use";
+    status("Camera busy");
+    return;
+  }
+
   cameraStatusEl.textContent = cameraActive ? "On" : "Starting…";
+}
+
+function updateStatusUi() {
+  updateCameraStatus();
+  updateLightingStatus();
+  updateStatePill();
+  updateScaleValues();
+}
+
+function updateLightingStatus() {
+  lightValue.textContent = !enableToggle.checked
+    ? "—"
+    : lowLight
+      ? "Low"
+      : "OK";
+}
+
+function updateStatePill() {
+  const enabled = enableToggle.checked;
+  const calibrated = Boolean(currentSettings.baseline);
+  let label = "Disabled";
+  let kind = "";
+
+  if (!enabled) {
+    label = "Disabled";
+    kind = "";
+  } else if (cameraError && cameraError.code === "permission") {
+    label = "Camera blocked";
+    kind = "bad";
+  } else if (cameraError && cameraError.code === "no-camera") {
+    label = "No camera";
+    kind = "bad";
+  } else if (cameraError && cameraError.code === "in-use") {
+    label = "Camera busy";
+    kind = "warn";
+  } else if (!calibrated || lastState === "uncalibrated") {
+    label = "Needs calibration";
+    kind = "warn";
+  } else if (lastState === "too-close") {
+    label = "Too close";
+    kind = "bad";
+  } else if (lastState === "no-face") {
+    label = "No face";
+    kind = "warn";
+  } else if (lastState === "low-light" || lowLight) {
+    label = "Low light";
+    kind = "warn";
+  } else {
+    label = "Neutral";
+    kind = "ok";
+  }
+
+  statePill.textContent = label;
+  statePill.className = `pill ${kind}`.trim();
+}
+
+function updateScaleValues() {
+  if (!enableToggle.checked) {
+    scaleValue.textContent = "—";
+    ratioValue.textContent = "—";
+    return;
+  }
+
+  if (typeof lastScale === "number") {
+    scaleValue.textContent = `${lastScale.toFixed(2)}x`;
+  } else {
+    scaleValue.textContent = "—";
+  }
+
+  if (typeof lastRatio === "number") {
+    ratioValue.textContent = `${lastRatio.toFixed(2)}x`;
+  } else {
+    ratioValue.textContent = "—";
+  }
 }
