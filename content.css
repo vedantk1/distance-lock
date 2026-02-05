@@ -13,6 +13,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   transition: opacity 0.2s ease;
   user-select: none;
+  transform-origin: top right;
 }
 
 #ilz-hud[data-state="ok"] {

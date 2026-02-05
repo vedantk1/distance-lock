@@ -150,6 +150,10 @@ async function handleSettingsUpdate(partial) {
   if (next.enabled) {
     await ensureOffscreenDocument();
     await sendSettingsToOffscreen(next, true);
+    // Inject content script into tabs that don't have it yet
+    if (!current.enabled && next.enabled) {
+      await injectContentScriptIntoTabs();
+    }
   } else {
     lastStatus = { ...lastStatus, cameraActive: false, cameraError: null };
     broadcast({ type: "status-update", ...lastStatus });
@@ -158,6 +162,40 @@ async function handleSettingsUpdate(partial) {
   }
 
   return next;
+}
+
+async function injectContentScriptIntoTabs() {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      // Skip chrome:// and other restricted URLs
+      if (
+        !tab.url ||
+        tab.url.startsWith("chrome://") ||
+        tab.url.startsWith("chrome-extension://") ||
+        tab.url.startsWith("about:")
+      ) {
+        continue;
+      }
+      try {
+        // Check if content script is already injected by looking for our port
+        // If not connected, inject the script
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content.js"],
+        });
+        await chrome.scripting.insertCSS({
+          target: { tabId: tab.id },
+          files: ["content.css"],
+        });
+      } catch (e) {
+        // Tab may not allow script injection (e.g., chrome web store)
+        console.debug("Could not inject into tab", tab.id, e.message);
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to inject content scripts:", e);
+  }
 }
 
 async function getSettings() {

@@ -1,119 +1,129 @@
-const port = chrome.runtime.connect({ name: "inverse-lean-zoom" });
-let enabled = false;
-let currentScale = 1;
-let pauseVideoOnLean = true;
-let lastState = "ok";
-const pausedVideos = new Set();
+// Guard against duplicate injection
+if (window.__ilzContentScriptLoaded) {
+  // Already loaded, exit early
+} else {
+  window.__ilzContentScriptLoaded = true;
 
-const hud = createHud();
+  const port = chrome.runtime.connect({ name: "inverse-lean-zoom" });
+  let enabled = false;
+  let currentScale = 1;
+  let pauseVideoOnLean = true;
+  let lastState = "ok";
+  const pausedVideos = new Set();
 
-port.onMessage.addListener((message) => {
-  if (!message || typeof message.type !== "string") {
-    return;
-  }
+  const hud = createHud();
 
-  if (message.type === "settings") {
-    enabled = Boolean(message.settings?.enabled);
-    pauseVideoOnLean = Boolean(message.settings?.pauseVideoOnLean);
-    if (!enabled) {
-      resetScale();
-    }
-    return;
-  }
-
-  if (message.type === "scale-update") {
-    if (typeof message.scale !== "number") {
+  port.onMessage.addListener((message) => {
+    if (!message || typeof message.type !== "string") {
       return;
     }
 
-    if (!enabled) {
-      resetScale();
+    if (message.type === "settings") {
+      enabled = Boolean(message.settings?.enabled);
+      pauseVideoOnLean = Boolean(message.settings?.pauseVideoOnLean);
+      if (!enabled) {
+        resetScale();
+      }
       return;
     }
 
-    applyScale(message.scale);
-    updateHud(message);
-    handleVideoPause(message.state);
-  }
-});
+    if (message.type === "scale-update") {
+      if (typeof message.scale !== "number") {
+        return;
+      }
 
-function applyScale(scale) {
-  currentScale = scale;
-  document.documentElement.style.transform = `scale(${scale})`;
-  document.documentElement.style.transformOrigin = "center top";
-}
+      if (!enabled) {
+        resetScale();
+        return;
+      }
 
-function resetScale() {
-  currentScale = 1;
-  document.documentElement.style.transform = "";
-  document.documentElement.style.transformOrigin = "";
-  updateHud({ state: "disabled" });
-}
+      applyScale(message.scale);
+      updateHud(message);
+      handleVideoPause(message.state);
+    }
+  });
 
-function createHud() {
-  const el = document.createElement("div");
-  el.id = "ilz-hud";
-  el.hidden = true;
-  el.textContent = "Inverse Lean Zoom";
-  document.documentElement.appendChild(el);
-  return el;
-}
-
-function updateHud(message) {
-  const state = message.state || "ok";
-  if (state === "disabled") {
-    hud.hidden = true;
-    return;
+  function applyScale(scale) {
+    currentScale = scale;
+    document.documentElement.style.transform = `scale(${scale})`;
+    document.documentElement.style.transformOrigin = "center top";
+    // Counter-scale the HUD so it stays constant size
+    hud.style.transform = `scale(${1 / scale})`;
   }
 
-  hud.hidden = false;
-  hud.dataset.state = state;
-
-  if (state === "too-close") {
-    hud.textContent = "Lean detected → zooming out";
-  } else if (state === "camera-permission") {
-    hud.textContent = "Camera permission denied";
-  } else if (state === "camera-error") {
-    hud.textContent = "Camera unavailable";
-  } else if (state === "low-light") {
-    hud.textContent = "Lighting too low";
-  } else if (state === "no-face") {
-    hud.textContent = "No face detected";
-  } else if (state === "uncalibrated") {
-    hud.textContent = "Calibrate to start";
-  } else {
-    hud.textContent = `Neutral posture (${currentScale.toFixed(2)}x)`;
-  }
-}
-
-function handleVideoPause(state) {
-  const nextState = state || "ok";
-
-  if (!pauseVideoOnLean) {
-    lastState = nextState;
-    return;
+  function resetScale() {
+    currentScale = 1;
+    document.documentElement.style.transform = "";
+    document.documentElement.style.transformOrigin = "";
+    hud.style.transform = "";
+    updateHud({ state: "disabled" });
   }
 
-  if (nextState === "too-close") {
-    const videos = document.querySelectorAll("video");
-    videos.forEach((video) => {
-      if (!video.paused && !video.ended) {
-        try {
-          video.pause();
-          pausedVideos.add(video);
-        } catch (error) {
-          // Ignore playback errors.
+  function createHud() {
+    const el = document.createElement("div");
+    el.id = "ilz-hud";
+    el.hidden = true;
+    el.textContent = "Inverse Lean Zoom";
+    document.documentElement.appendChild(el);
+    return el;
+  }
+
+  function updateHud(message) {
+    const state = message.state || "ok";
+    if (state === "disabled") {
+      hud.hidden = true;
+      return;
+    }
+
+    hud.hidden = false;
+    hud.dataset.state = state;
+
+    if (state === "too-close") {
+      hud.textContent = "Lean detected → zooming out";
+    } else if (state === "camera-permission") {
+      hud.textContent = "Camera permission denied";
+    } else if (state === "camera-error") {
+      hud.textContent = "Camera unavailable";
+    } else if (state === "low-light") {
+      hud.textContent = "Lighting too low";
+    } else if (state === "no-face") {
+      hud.textContent = "No face detected";
+    } else if (state === "uncalibrated") {
+      hud.textContent = "Calibrate to start";
+    } else {
+      hud.textContent = `Neutral posture (${currentScale.toFixed(2)}x)`;
+    }
+  }
+
+  function handleVideoPause(state) {
+    const nextState = state || "ok";
+
+    if (!pauseVideoOnLean) {
+      lastState = nextState;
+      return;
+    }
+
+    if (nextState === "too-close") {
+      const videos = document.querySelectorAll("video");
+      videos.forEach((video) => {
+        if (!video.paused && !video.ended) {
+          try {
+            video.pause();
+            pausedVideos.add(video);
+          } catch (error) {
+            // Ignore playback errors.
+          }
         }
-      }
-    });
-  } else if (lastState === "too-close" && nextState !== "too-close") {
-    pausedVideos.forEach((video) => {
-      if (video.paused && !video.ended) {
-        video.play().catch(() => {});
-      }
-    });
-    pausedVideos.clear();
-  }
+      });
+    } else if (lastState === "too-close" && nextState !== "too-close") {
+      pausedVideos.forEach((video) => {
+        if (video.paused && !video.ended) {
+          video.play().catch(() => {});
+        }
+      });
+      pausedVideos.clear();
+    }
 
-  lastState = nextState;
-}
+    lastState = nextState;
+  }
+} // End of duplicate injection guard
