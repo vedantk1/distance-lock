@@ -17,6 +17,8 @@ const DEFAULT_SETTINGS = {
   lowLightLumaMin: 35,
   baseline: null,
   pauseVideoOnLean: true,
+  soundEnabled: true,
+  soundVolume: 0.18,
 };
 
 const state = {
@@ -39,6 +41,11 @@ const state = {
   smoothSize: null,
   scale: 1,
   tooClose: false,
+  lastStateLabel: "disabled",
+  maxZoomSounded: false,
+  lastBoingTs: 0,
+  lastSnapTs: 0,
+  audioCtx: null,
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -50,6 +57,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     (async () => {
       try {
         state.settings = { ...state.settings, ...message.settings };
+        await primeAudioContext();
         if (state.settings.enabled) {
           await start();
         } else {
@@ -142,6 +150,8 @@ async function stop() {
   state.scale = 1;
   state.tooClose = false;
   state.smoothSize = null;
+  state.lastStateLabel = "disabled";
+  state.maxZoomSounded = false;
   state.cameraActive = false;
   state.cameraError = null;
   sendStatusUpdate();
@@ -324,6 +334,7 @@ function easeToScale(targetScale, stateLabel, ratio) {
   const step = state.settings.maxScaleStep;
   const next = clamp(targetScale, state.scale - step, state.scale + step);
   state.scale = next;
+  handleSoundEffects(stateLabel, next);
   sendScaleUpdate({ state: stateLabel, ratio });
 }
 
@@ -350,11 +361,156 @@ function reportError(error) {
   state.cameraActive = false;
   state.running = false;
   state.lowLight = false;
+  state.lastStateLabel = "camera-error";
+  state.maxZoomSounded = false;
   sendStatusUpdate();
   sendScaleUpdate({
     state: info?.code === "permission" ? "camera-permission" : "camera-error",
     error: info?.message,
   });
+}
+
+function handleSoundEffects(stateLabel, scale) {
+  const now = performance.now();
+  const enteringTooClose =
+    stateLabel === "too-close" && state.lastStateLabel !== "too-close";
+  const nearMinScale =
+    stateLabel === "too-close" && scale <= state.settings.minScale + 0.01;
+
+  if (!state.settings.soundEnabled) {
+    state.lastStateLabel = stateLabel;
+    if (stateLabel !== "too-close") {
+      state.maxZoomSounded = false;
+    }
+    return;
+  }
+
+  if (enteringTooClose && now - state.lastBoingTs >= 450) {
+    playBoing();
+    state.lastBoingTs = now;
+  }
+
+  if (nearMinScale && !state.maxZoomSounded && now - state.lastSnapTs >= 800) {
+    playSnap();
+    state.maxZoomSounded = true;
+    state.lastSnapTs = now;
+  }
+
+  if (stateLabel !== "too-close") {
+    state.maxZoomSounded = false;
+  }
+
+  state.lastStateLabel = stateLabel;
+}
+
+async function primeAudioContext() {
+  if (!state.settings.soundEnabled) {
+    return;
+  }
+
+  const context = ensureAudioContext();
+  if (!context || context.state !== "suspended") {
+    return;
+  }
+
+  try {
+    await context.resume();
+  } catch (_error) {
+    // Ignored: context resumes later when browser allows playback.
+  }
+}
+
+function ensureAudioContext() {
+  if (state.audioCtx) {
+    return state.audioCtx;
+  }
+
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextCtor) {
+    return null;
+  }
+
+  try {
+    state.audioCtx = new AudioContextCtor();
+  } catch (_error) {
+    state.audioCtx = null;
+  }
+
+  return state.audioCtx;
+}
+
+function playBoing() {
+  playTone({
+    wave: "triangle",
+    fromHz: 460,
+    toHz: 180,
+    duration: 0.17,
+    gain: 0.17,
+  });
+  playTone({
+    wave: "sine",
+    fromHz: 250,
+    toHz: 170,
+    duration: 0.11,
+    gain: 0.11,
+    delay: 0.075,
+  });
+}
+
+function playSnap() {
+  playTone({
+    wave: "square",
+    fromHz: 780,
+    toHz: 520,
+    duration: 0.08,
+    gain: 0.1,
+  });
+}
+
+function playTone({
+  wave = "sine",
+  fromHz = 440,
+  toHz = 220,
+  duration = 0.1,
+  gain = 0.1,
+  delay = 0,
+}) {
+  const context = ensureAudioContext();
+  if (!context) {
+    return;
+  }
+
+  if (context.state === "suspended") {
+    context.resume().catch(() => {});
+    return;
+  }
+
+  const volume = clamp(state.settings.soundVolume ?? 0, 0, 1);
+  if (volume <= 0) {
+    return;
+  }
+
+  const now = context.currentTime + delay;
+  const end = now + duration;
+
+  const oscillator = context.createOscillator();
+  oscillator.type = wave;
+  oscillator.frequency.setValueAtTime(fromHz, now);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, toHz), end);
+
+  const envelope = context.createGain();
+  envelope.gain.setValueAtTime(0.0001, now);
+  envelope.gain.exponentialRampToValueAtTime(
+    Math.max(0.0001, gain * volume),
+    now + Math.min(0.015, duration / 3),
+  );
+  envelope.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  oscillator.connect(envelope);
+  envelope.connect(context.destination);
+
+  oscillator.start(now);
+  oscillator.stop(end);
 }
 
 function normalizeError(error) {

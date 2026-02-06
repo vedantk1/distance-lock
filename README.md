@@ -35,6 +35,8 @@ For security details, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
 
 - **Sensitivity**: adjusts aggressiveness.
 - **Pause Video On Lean**: pauses playing videos when you lean in.
+- **Sound FX**: subtle local boing/snap cues for lean-in and max zoom-out.
+- **Sound Volume**: controls cue loudness.
 
 ## Notes
 

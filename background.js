@@ -21,6 +21,8 @@ const DEFAULT_SETTINGS = {
   lowLightLumaMin: 35,
   baseline: null,
   pauseVideoOnLean: true,
+  soundEnabled: true,
+  soundVolume: 0.18,
 };
 
 chrome.runtime.onInstalled.addListener((details) => {

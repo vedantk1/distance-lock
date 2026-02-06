@@ -47,6 +47,7 @@ The extension follows a **three-tier architecture** with isolated security bound
 │  • Calibration button                                            │
 │  • Sensitivity slider (k parameter)                              │
 │  • Video pause-on-lean toggle                                    │
+│  • Sound FX toggle + volume                                      │
 │  • Camera status indicator                                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -264,6 +265,8 @@ Prevents jarring jumps; creates smooth transitions.
 | Calibrate           | Set baseline (current face width) | `settings.baseline`         |
 | Sensitivity         | Adjust zoom aggressiveness        | `settings.k` (0.8–2.0)      |
 | Pause Video On Lean | Auto-pause videos when leaning in | `settings.pauseVideoOnLean` |
+| Sound FX            | Enable subtle meme sound cues     | `settings.soundEnabled`     |
+| Sound Volume        | Control cue loudness              | `settings.soundVolume`      |
 
 **Status Indicators:**
 

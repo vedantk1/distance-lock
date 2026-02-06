@@ -25,6 +25,25 @@
       </label>
       <div class="helper">Pauses playing videos when too close.</div>
 
+      <label class="row toggle-row">
+        <span>Sound FX</span>
+        <input id="soundToggle" type="checkbox" />
+      </label>
+      <div class="helper">Subtle boing + snap cues.</div>
+
+      <div class="row">
+        <span>Sound Volume</span>
+        <span id="soundVolumeValue" class="value">18%</span>
+      </div>
+      <input
+        id="soundVolume"
+        type="range"
+        min="0"
+        max="0.4"
+        step="0.01"
+        value="0.18"
+      />
+
       <div class="row">
         <span>Sensitivity</span>
         <span id="sensitivityValue" class="value">1.20</span>

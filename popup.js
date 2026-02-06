@@ -1,6 +1,9 @@
 const enableToggle = document.getElementById("enableToggle");
 const calibrateBtn = document.getElementById("calibrateBtn");
 const pauseVideoToggle = document.getElementById("pauseVideoToggle");
+const soundToggle = document.getElementById("soundToggle");
+const soundVolumeInput = document.getElementById("soundVolume");
+const soundVolumeValue = document.getElementById("soundVolumeValue");
 const sensitivity = document.getElementById("sensitivity");
 const sensitivityValue = document.getElementById("sensitivityValue");
 const statusEl = document.getElementById("status");
@@ -101,6 +104,20 @@ async function init() {
       pauseVideoOnLean: pauseVideoToggle.checked,
     });
     syncUi(next);
+  });
+
+  soundToggle.addEventListener("change", async () => {
+    const next = await updateSettings({
+      soundEnabled: soundToggle.checked,
+    });
+    syncUi(next, true);
+  });
+
+  soundVolumeInput.addEventListener("input", async () => {
+    const soundVolume = Number.parseFloat(soundVolumeInput.value);
+    soundVolumeValue.textContent = `${Math.round(soundVolume * 100)}%`;
+    const next = await updateSettings({ soundVolume });
+    syncUi(next, true);
   });
 
   sensitivity.addEventListener("input", async () => {
@@ -210,6 +227,12 @@ function syncUi(settings, quiet = false) {
   currentSettings = settings;
   enableToggle.checked = Boolean(settings.enabled);
   pauseVideoToggle.checked = Boolean(settings.pauseVideoOnLean);
+  soundToggle.checked = settings.soundEnabled !== false;
+  if (typeof settings.soundVolume === "number") {
+    soundVolumeInput.value = String(settings.soundVolume);
+    soundVolumeValue.textContent = `${Math.round(settings.soundVolume * 100)}%`;
+  }
+  soundVolumeInput.disabled = !soundToggle.checked;
   if (typeof settings.k === "number") {
     sensitivity.value = String(settings.k);
     sensitivityValue.textContent = settings.k.toFixed(2);
