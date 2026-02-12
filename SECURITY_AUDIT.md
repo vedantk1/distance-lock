@@ -118,28 +118,28 @@ hud.dataset.state = state;
 
 ### 4. Permissions Audit ⚠️ REVIEW
 
-**Status:** Mostly appropriate, one concern
+**Status:** Appropriate with broad host scope tradeoff
 
 #### Declared Permissions
 
 ```json
-"permissions": ["storage", "offscreen"]
+"permissions": ["storage", "offscreen", "tabs", "scripting"]
 "host_permissions": ["<all_urls>"]
 ```
 
 **Analysis:**
 
-| Permission   | Justification                         | Risk       | Verdict                 |
-| ------------ | ------------------------------------- | ---------- | ----------------------- |
-| `storage`    | Save settings (baseline, sensitivity) | Low        | ✅ Necessary            |
-| `offscreen`  | Isolated camera access                | Low        | ✅ Necessary            |
-| `<all_urls>` | Inject content scripts                | **Medium** | ⚠️ **OVERPERMISSIONED** |
+| Permission   | Justification                                                   | Risk   | Verdict        |
+| ------------ | --------------------------------------------------------------- | ------ | -------------- |
+| `storage`    | Save settings (baseline, sensitivity, toggles)                 | Low    | ✅ Necessary   |
+| `offscreen`  | Isolated camera access and local detection                     | Low    | ✅ Necessary   |
+| `tabs`       | Enumerate open tabs so already-open pages can be updated       | Low    | ✅ Necessary   |
+| `scripting`  | Inject content script/CSS into existing tabs after enable      | Low    | ✅ Necessary   |
+| `<all_urls>` | Apply scaling/HUD behavior across user browsing context        | Medium | ⚠️ Broad scope |
 
-#### ⚠️ ISSUE: Overly Broad Host Permissions
+#### Review Point: Broad Host Permissions
 
-**Problem:** `<all_urls>` grants access to **all websites**, but extension only needs to apply CSS transforms.
-
-**Current:** Extension can inject into `file://`, `chrome-extension://`, and all HTTP/HTTPS sites.
+**Current:** Extension requests broad host coverage. Chrome still blocks injection on restricted/internal pages.
 
 **Recommendation (HIGH PRIORITY):**
 
@@ -173,7 +173,7 @@ hud.dataset.state = state;
 
 Request permission only when user enables extension. Better UX but requires refactoring.
 
-**For MVP:** Current approach is **acceptable** but include prominent privacy notice in README/Web Store listing.
+**For MVP:** Current approach is acceptable when paired with clear privacy and permission rationale.
 
 ---
 
@@ -259,15 +259,15 @@ if (message.type === "scale-update") {
 
 ### 7. Dependency Security ⚠️ REVIEW
 
-**Status:** Needs audit
+**Status:** Partially documented; integrity metadata still recommended
 
 #### MediaPipe Bundle
 
-- **Version:** Unknown (bundled, no package.json)
+- **Version:** Documented in `assets/README.md` (`@mediapipe/tasks-vision@0.10.32`)
 - **Source:** `assets/mediapipe/vision_bundle.mjs`
 - **Size:** ~2MB (minified)
 
-⚠️ **ISSUE:** No dependency manifest or version tracking
+⚠️ **ISSUE:** No file integrity hashes tracked in-repo
 
 **Recommendations (MEDIUM PRIORITY):**
 
@@ -276,8 +276,8 @@ if (message.type === "scale-update") {
    ```md
    # assets/README.md
 
-   MediaPipe Tasks Vision v0.10.14 (2025-11-20)
-   Downloaded from: https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14
+   MediaPipe Tasks Vision v0.10.32
+   Source: npm package + model URL
    ```
 
 2. **Add integrity check (optional):**
@@ -286,7 +286,7 @@ if (message.type === "scale-update") {
    // package.json (create for dependency tracking only)
    {
      "dependencies": {
-       "@mediapipe/tasks-vision": "0.10.14"
+       "@mediapipe/tasks-vision": "0.10.32"
      }
    }
    ```
@@ -461,7 +461,7 @@ async function stop() {
 | Permissions      | ⚠️ Review | Medium   | Document `<all_urls>` justification |
 | Camera/Privacy   | ✅ Pass   | None     | None                                |
 | Message Security | ✅ Pass   | Low      | Optional hardening                  |
-| Dependencies     | ⚠️ Review | Low      | Document MediaPipe version          |
+| Dependencies     | ⚠️ Review | Low      | Add integrity hashes for bundled assets |
 | Code Injection   | ✅ Pass   | None     | None                                |
 | Storage          | ✅ Pass   | None     | None                                |
 | Error Handling   | ✅ Pass   | Very Low | None                                |
@@ -482,8 +482,9 @@ _None — extension is safe for MVP release_
    - Explain why `<all_urls>` is necessary (applies scaling to all sites)
    - Add prominent privacy notice: "All processing is local. No data sent to servers."
 
-2. **Document dependency versions** in `assets/README.md`
-   - MediaPipe version, download source, integrity hashes
+2. **Track integrity metadata** for bundled assets
+   - Keep version/source in `assets/README.md`
+   - Add SHA256 hashes for JS/WASM/model artifacts
 
 ### Could Fix (Future Enhancements)
 
@@ -516,7 +517,7 @@ _None — extension is safe for MVP release_
 | Output encoding             | ✅ Implemented (textContent)      |
 | Secure defaults             | ✅ Extension disabled by default  |
 | Error handling              | ✅ Implemented                    |
-| Dependency management       | ⚠️ Needs documentation            |
+| Dependency management       | ⚠️ Partial (versioned, no hashes) |
 | Privacy by design           | ✅ Exemplary (local-only)         |
 | Secure communication        | ✅ Internal messages only         |
 | Resource cleanup            | ✅ Implemented                    |

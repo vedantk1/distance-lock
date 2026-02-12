@@ -87,6 +87,8 @@ distance-lock/
 
 - `storage`: Save/retrieve settings (calibration baseline, sensitivity, etc.)
 - `offscreen`: Create and manage offscreen documents for camera access
+- `tabs`: Query currently open tabs when enabling the extension
+- `scripting`: Inject content scripts/CSS into already-open tabs
 - `host_permissions: <all_urls>`: Content scripts run on all sites
 - `script-src 'wasm-unsafe-eval'`: Required for MediaPipe WASM
 
@@ -250,7 +252,7 @@ Prevents jarring jumps; creates smooth transitions.
 **HUD Styling** (`content.css`):
 
 - Dark semi-transparent background with high z-index (2147483647)
-- State-based color coding: green (ok) → red (too-close) → yellow (low-light)
+- State-based color coding: red (too-close) and yellow (low-light)
 - Smooth opacity transitions
 
 ---
@@ -265,14 +267,17 @@ Prevents jarring jumps; creates smooth transitions.
 | Calibrate           | Set baseline (current face width) | `settings.baseline`         |
 | Sensitivity         | Adjust zoom aggressiveness        | `settings.k` (0.8–2.0)      |
 | Pause Video On Lean | Auto-pause videos when leaning in | `settings.pauseVideoOnLean` |
-| Sound FX            | Enable subtle meme sound cues     | `settings.soundEnabled`     |
+| Sound FX            | Enable subtle sound cues          | `settings.soundEnabled`     |
 | Sound Volume        | Control cue loudness              | `settings.soundVolume`      |
+| Advanced sliders    | Tune thresholds and pacing         | `minScale`, `engageThreshold`, `maxScaleStep`, `noFaceResetMs`, `lowLightLumaMin` |
 
 **Status Indicators:**
 
-- Extension state (Disabled / Enabled / Enabled · Calibrate)
+- State pill (Disabled / Needs calibration / Too close / Neutral / etc.)
 - Camera status (Off / Starting… / On)
+- Lighting status (OK / Low)
 - Calibration status (Yes / No)
+- Live scale and distance ratio
 
 **Event Flow:**
 
@@ -316,11 +321,9 @@ background.js forwards to offscreen document
     ↓
 offscreen.js: calibrate() sets baseline = currentSmoothedFaceWidth
     ↓
-offscreen.js sends { type: "baseline-update", baseline: X }
+background.js persists baseline via settings-update
     ↓
-background.js persists to chrome.storage.local
-    ↓
-broadcast to all listeners
+broadcast settings to all listeners
     ↓
 popup.js shows "Calibrated: Yes"
 ```
@@ -373,7 +376,9 @@ All settings stored in `chrome.storage.local` under `settings` key.
   noFaceResetMs: 1500,         // Time to reset scale when no face detected
   lowLightLumaMin: 35,         // Luma threshold (0–255) to pause detection
   baseline: null,              // Calibrated face width (pixels)
-  pauseVideoOnLean: true       // Auto-pause videos when leaning in
+  pauseVideoOnLean: true,      // Auto-pause videos when leaning in
+  soundEnabled: true,          // Enable local audio cues
+  soundVolume: 0.18            // Cue volume (0.0-1.0)
 }
 ```
 
@@ -399,14 +404,14 @@ All settings stored in `chrome.storage.local` under `settings` key.
 2. **Offscreen Isolation:** Camera access confined to offscreen document; no web page can directly access the stream.
 3. **CSP Compliance:** WASM sandbox enabled via `wasm-unsafe-eval` in extension pages only.
 4. **Storage:** Settings stored locally in `chrome.storage.local`; no cloud sync.
-5. **Permissions:** `host_permissions: <all_urls>` for content script injection, not for API access.
+5. **Permissions:** Broad host scope for page transforms (`<all_urls>`) plus `tabs`/`scripting` for updating already-open tabs.
 
 ---
 
 ## Browser Compatibility
 
-- **Target:** Chrome 109+ (Manifest V3, offscreen documents)
-- **Offscreen API:** Requires Chrome 120+ for `offscreen.hasDocument()` fallback detection
+- **Target:** Recent Chrome with Manifest V3 offscreen document support
+- **Offscreen detection:** Uses `offscreen.hasDocument()` when available, otherwise `runtime.getContexts()` fallback
 - **MediaPipe:** WASM support on all modern browsers
 
 ---

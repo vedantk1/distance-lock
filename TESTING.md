@@ -5,17 +5,14 @@
 ### 1. Load Extension in Chrome
 
 ```bash
-# Navigate to project directory
-cd "/Users/vedan/Projects/distance lock"
-
-# Open Chrome extensions page
-open -a "Google Chrome" "chrome://extensions"
+# From the parent directory, enter the repository folder
+cd "distance lock"
 ```
 
 **In Chrome:**
 1. Enable **Developer mode** (toggle in top-right)
 2. Click **Load unpacked**
-3. Select this folder: `/Users/vedan/Projects/distance lock`
+3. Select this repository folder (`distance lock/`)
 4. Extension should appear with green indicator
 
 **Verify:**
@@ -155,7 +152,7 @@ Test on various types of websites:
 - ✅ Video sites (youtube.com, vimeo.com)
 - ✅ News sites (nytimes.com, bbc.com)
 - ✅ Web apps (gmail.com, docs.google.com)
-- ✅ Local HTML files (`file:///...`)
+- ✅ Local HTML files opened from disk
 
 **Expected:** Works consistently across all sites
 

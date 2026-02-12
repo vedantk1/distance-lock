@@ -1,53 +1,123 @@
-# Inverse Lean Zoom (Chrome Extension)
+# Inverse Lean Zoom
 
-Local-only extension that shrinks the page when you lean in.
+Inverse Lean Zoom is a Chrome extension (Manifest V3) that shrinks page scale when you lean toward your screen.
 
-## Privacy & Security
+All face detection runs locally in an offscreen document using bundled MediaPipe WASM assets. No camera frames are uploaded.
 
-**🔒 100% Local Processing**
+## What it does
 
-- All face detection runs on your device using MediaPipe WASM
-- No images or data are ever sent to external servers
-- No analytics, tracking, or telemetry
-- Camera stream never leaves your browser
+- Detects lean-in distance changes from webcam face size.
+- Applies inverse page zoom (`scale(...)`) across tabs.
+- Uses smoothing + hysteresis to avoid jitter and flicker.
+- Supports one-click calibration for your neutral posture.
+- Optionally pauses playing videos while you are too close.
+- Optionally plays local sound cues for lean-in and max zoom-out.
 
-**Permissions Explained:**
+## Privacy model
 
-- `storage`: Save your calibration baseline and preferences locally
-- `offscreen`: Isolated camera access for face detection
-- `<all_urls>`: Required to apply zoom effect on all websites you visit
+- Local-only processing: face detection runs on-device.
+- No analytics, telemetry, or remote API calls for detection.
+- Camera stream is used only inside the extension offscreen context.
+- Only settings are stored in `chrome.storage.local`.
 
-For security details, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+See also:
+- [SECURITY.md](SECURITY.md)
+- [SECURITY_AUDIT.md](SECURITY_AUDIT.md)
 
-## Load in Chrome
+## Permissions (and why)
+
+| Permission | Why it is needed |
+| --- | --- |
+| `storage` | Persist settings (enabled state, baseline, thresholds, toggles). |
+| `offscreen` | Run camera + detection in an isolated offscreen document. |
+| `tabs` | Discover open tabs when enabling so current tabs can be activated without reload. |
+| `scripting` | Inject `content.js` and `content.css` into already-open tabs on enable. |
+| `host_permissions: <all_urls>` | Apply zoom/HUD behavior on the sites you visit. |
+
+## Install (load unpacked)
 
 1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Click **Load unpacked** and select this folder.
+2. Enable Developer mode.
+3. Click **Load unpacked**.
+4. Select this repository folder.
 
-## First run
+## First-run setup
 
 1. Click the extension icon.
-2. Toggle **Enable**.
-3. Click **Calibrate** while sitting at a comfortable distance.
+2. Turn **Enable** on.
+3. Grant camera access when prompted.
+4. Sit at your normal distance and click **Calibrate**.
 
 ## Controls
 
-- **Sensitivity**: adjusts aggressiveness.
-- **Pause Video On Lean**: pauses playing videos when you lean in.
-- **Sound FX**: subtle local boing/snap cues for lean-in and max zoom-out.
-- **Sound Volume**: controls cue loudness.
+| Control | Description |
+| --- | --- |
+| Enable | Turns the extension on/off. |
+| Calibrate | Sets the current face width as baseline distance. |
+| Sensitivity | Controls lean response aggressiveness (`k`). |
+| Pause Video On Lean | Pauses playing videos while state is `too-close`. |
+| Sound FX | Enables local cue sounds. |
+| Sound Volume | Sets cue volume. |
 
-## Notes
+### Advanced controls
 
-- All processing is local (MediaPipe WASM + model bundled in `assets/`).
-- If the camera indicator stays on “Starting…”, check camera permissions for the extension.
+| Control | Internal setting | Effect |
+| --- | --- | --- |
+| Max Zoom Out | `minScale` | Lower value allows more shrink. |
+| Trigger Distance | `engageThreshold` | Ratio required to enter `too-close`. |
+| Transition Speed | `maxScaleStep` | Max scale change per update. |
+| Face Lost Timeout | `noFaceResetMs` | Delay before easing back when no face is detected. |
+| Low Light Threshold | `lowLightLumaMin` | Minimum brightness before detection pauses. |
 
-## File layout
+## How it works
+
+1. `popup.js` updates settings and requests calibration.
+2. `background.js` persists settings and coordinates contexts.
+3. `offscreen.js` captures camera frames, runs MediaPipe face detection, and computes scale.
+4. `content.js` applies transform + HUD in pages.
+
+For implementation details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Project layout
 
 - `manifest.json`
 - `background.js`
-- `offscreen.html` / `offscreen.js`
-- `content.js` / `content.css`
-- `popup.html` / `popup.css` / `popup.js`
-- `assets/`
+- `offscreen.html`, `offscreen.js`
+- `popup.html`, `popup.css`, `popup.js`
+- `content.js`, `content.css`
+- `permission.html`, `permission.js`
+- `assets/` (bundled MediaPipe JS/WASM/model)
+- `LICENSE`
+
+## Development
+
+No build step is required right now; this repo is plain extension source.
+
+Typical workflow:
+1. Edit source files.
+2. Open `chrome://extensions`.
+3. Click **Reload** on the extension card.
+4. Re-test in an existing tab and a new tab.
+
+## Testing
+
+Manual test coverage and release checklist are documented in [TESTING.md](TESTING.md).
+
+## Troubleshooting
+
+- Camera stuck at `Starting...`: grant camera permission and ensure camera is not in use by another app.
+- No zoom effect: verify extension is enabled and calibration completed.
+- No HUD on a page: restricted pages (for example `chrome://` pages) do not allow content script injection.
+- Choppy behavior: reduce sensitivity or transition speed in Advanced Settings.
+
+## Security reporting
+
+If you find a vulnerability, use the process in [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+## Open-source notes
+
+- Keep docs and permission rationale aligned with `manifest.json` when behavior changes.
